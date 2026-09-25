@@ -1,48 +1,21 @@
-import sys
-from scapy.all import sniff, IP, TCP, UDP, ICMP, Raw, wrpcap
+from scapy.all import sniff, IP, TCP
 
-captured_packets = []
-MAX_PACKETS = 30  # Auto-stop after capturing 30 packets!
+# A list of suspicious keywords to look for in packet payloads
+THREAT_KEYWORDS = [b"password", b"login", b"admin", b"root"]
 
 def packet_callback(packet):
     if packet.haslayer(IP):
-        captured_packets.append(packet)
-
         src_ip = packet[IP].src
         dst_ip = packet[IP].dst
-        protocol = "OTHER"
-        src_port = "-"
-        dst_port = "-"
+        
+        # Check for suspicious keywords in the payload
+        if packet.haslayer(TCP) and packet.haslayer('Raw'):
+            payload = packet['Raw'].load
+            for word in THREAT_KEYWORDS:
+                if word in payload.lower():
+                    print(f"[ALERT] Potential credential leak detected from {src_ip}!")
+        
+        print(f"[INFO] Packet: {src_ip} -> {dst_ip}")
 
-        if packet.haslayer(TCP):
-            protocol = "TCP"
-            src_port = packet[TCP].sport
-            dst_port = packet[TCP].dport
-        elif packet.haslayer(UDP):
-            protocol = "UDP"
-            src_port = packet[UDP].sport
-            dst_port = packet[UDP].dport
-        elif packet.haslayer(ICMP):
-            protocol = "ICMP"
-
-        print(f"[{len(captured_packets)}/{MAX_PACKETS}] [{protocol}] {src_ip}:{src_port} --> {dst_ip}:{dst_port}")
-
-def main():
-    print("=" * 65)
-    print("   CODEALPHA INDUSTRIAL NETWORK SNIFFER & THREAT INSPECTOR   ")
-    print("=" * 65)
-    print(f"[*] Capturing {MAX_PACKETS} live packets and auto-saving to PCAP...\n")
-
-    # count parameter stops sniffing automatically after 30 packets!
-    sniff(prn=packet_callback, count=MAX_PACKETS, store=False)
-
-    print("\n" + "=" * 65)
-    print("[*] Capture Complete!")
-    if captured_packets:
-        pcap_file = "network_capture.pcap"
-        wrpcap(pcap_file, captured_packets)
-        print(f"[✔] SUCCESS: Saved {len(captured_packets)} packets to '{pcap_file}'!")
-    print("=" * 65)
-
-if __name__ == "__main__":
-    main()
+print("--- Professional Network Threat Inspector v1.0 ---")
+sniff(prn=packet_callback, count=20, store=False)
